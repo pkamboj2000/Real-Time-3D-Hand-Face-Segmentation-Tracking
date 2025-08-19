@@ -18,13 +18,14 @@ class LiveDemo:
     Live demo app for real-time hand/face segmentation.
     """
     
-    def __init__(self, method='classical', show_depth=True):
+    def __init__(self, method='classical', show_depth=True, camera_id=0):
         """
         Set up demo.
         
         Args:
             method: Segmentation method ('classical', 'unet', 'maskrcnn')
             show_depth: Whether to show depth estimation
+            camera_id: Camera ID (0=default, 1=external, etc.)
         """
         self.method = method
         self.show_depth = show_depth
@@ -45,13 +46,37 @@ class LiveDemo:
             2: (255, 0, 0),    # Face - blue
         }
         
-        # Initialize camera
-        self.cap = cv2.VideoCapture(0)
+        # Try multiple camera IDs and print info for each
+        import platform
+        self.cap = None
+        found = False
+        print("\n--- Camera Device Scan ---")
+        for cam_id in [camera_id, 0, 1, 2, 3, 4]:
+            cap = cv2.VideoCapture(cam_id)
+            if cap.isOpened():
+                # Try to grab a frame and print info
+                ret, frame = cap.read()
+                if ret:
+                    print(f"[ID {cam_id}] - WORKING camera (showing preview window)")
+                    cv2.imshow(f'Camera {cam_id} Preview', frame)
+                    cv2.waitKey(1000)  # Show for 1 second
+                    cv2.destroyWindow(f'Camera {cam_id} Preview')
+                    if not found:
+                        self.cap = cap
+                        found = True
+                        print(f"Selected camera {cam_id} for demo.")
+                    else:
+                        cap.release()
+                else:
+                    print(f"[ID {cam_id}] - Opened but no frame.")
+                    cap.release()
+            else:
+                print(f"[ID {cam_id}] - Not available.")
+        print("--- End Camera Scan ---\n")
+        if self.cap is None:
+            raise ValueError("Could not open any camera")
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        
-        if not self.cap.isOpened():
-            raise ValueError("Could not open camera")
     
     def create_overlay_mask(self, mask, alpha=0.6):
         """
@@ -86,34 +111,42 @@ class LiveDemo:
             return self.models['classical'].segment_hands_faces(frame)
         
         elif self.method == 'unet':
-            # Prep for U-Net
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float() / 255.0
-            frame_tensor = frame_tensor.unsqueeze(0)
-            
-            with torch.no_grad():
-                output = self.models['unet'](frame_tensor)
-                mask = torch.argmax(output, dim=1).squeeze().numpy()
-            
-            return mask.astype(np.uint8)
+            try:
+                # Prep for U-Net
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float() / 255.0
+                frame_tensor = frame_tensor.unsqueeze(0)
+                
+                with torch.no_grad():
+                    output = self.models['unet'](frame_tensor)
+                    mask = torch.argmax(output, dim=1).squeeze().numpy()
+                
+                return mask.astype(np.uint8)
+            except Exception as e:
+                print(f"U-Net failed, falling back to classical: {e}")
+                return self.models['classical'].segment_hands_faces(frame)
         
         elif self.method == 'maskrcnn':
-            predictions = self.models['maskrcnn'].predict(frame)
-            
-            # Convert instance masks to semantic mask
-            h, w = frame.shape[:2]
-            mask = np.zeros((h, w), dtype=np.uint8)
-            
-            if 'masks' in predictions and len(predictions['masks']) > 0:
-                masks = predictions['masks'].cpu().numpy()
-                labels = predictions['labels'].cpu().numpy()
-                scores = predictions['scores'].cpu().numpy()
+            try:
+                predictions = self.models['maskrcnn'].predict(frame)
                 
-                for i, (instance_mask, label, score) in enumerate(zip(masks, labels, scores)):
-                    if score > 0.5:  # Confidence threshold
-                        mask[instance_mask[0] > 0.5] = label
-            
-            return mask
+                # Convert instance masks to semantic mask
+                h, w = frame.shape[:2]
+                mask = np.zeros((h, w), dtype=np.uint8)
+                
+                if 'masks' in predictions and len(predictions['masks']) > 0:
+                    masks = predictions['masks'].cpu().numpy()
+                    labels = predictions['labels'].cpu().numpy()
+                    scores = predictions['scores'].cpu().numpy()
+                    
+                    for i, (instance_mask, label, score) in enumerate(zip(masks, labels, scores)):
+                        if score > 0.5:  # Confidence threshold
+                            mask[instance_mask[0] > 0.5] = label
+                
+                return mask
+            except Exception as e:
+                print(f"Mask R-CNN failed, falling back to classical: {e}")
+                return self.models['classical'].segment_hands_faces(frame)
         
         else:
             raise ValueError(f"Unknown method: {self.method}")
@@ -244,17 +277,17 @@ class LiveDemo:
                 # Show main result
                 cv2.imshow('Hand/Face Segmentation Demo', result)
                 
-                # Show depth map if enabled (disabled for cleaner demo)
-                # if self.show_depth and depth_map is not None:
-                #     depth_vis = cv2.applyColorMap(
-                #         cv2.convertScaleAbs(depth_map, alpha=255/depth_map.max()), 
-                #         cv2.COLORMAP_JET
-                #     )
-                #     cv2.imshow('Depth Map', depth_vis)
+                # Show depth map if enabled
+                if self.show_depth and depth_map is not None:
+                    depth_vis = cv2.applyColorMap(
+                        cv2.convertScaleAbs(depth_map, alpha=255/depth_map.max()), 
+                        cv2.COLORMAP_JET
+                    )
+                    cv2.imshow('Depth Map', depth_vis)
                 
-                # Show segmentation mask (commented out for cleaner demo)
-                # mask_vis = (mask * 127).astype(np.uint8)  # Scale for visibility
-                # cv2.imshow('Segmentation Mask', mask_vis)
+                # Show segmentation mask (black/white version)
+                mask_vis = (mask * 127).astype(np.uint8)  # Scale for visibility
+                cv2.imshow('Segmentation Mask', mask_vis)
                 
                 # Handle key presses
                 key = cv2.waitKey(1) & 0xFF
@@ -305,7 +338,8 @@ def main():
     try:
         demo = LiveDemo(
             method=args.method,
-            show_depth=not args.no_depth
+            show_depth=not args.no_depth,
+            camera_id=args.camera_id
         )
         demo.run()
         
