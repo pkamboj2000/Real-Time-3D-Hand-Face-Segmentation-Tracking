@@ -15,12 +15,12 @@ from collections import deque
 
 class LiveDemo:
     """
-    Live demo application for real-time hand/face segmentation.
+    Live demo app for real-time hand/face segmentation.
     """
     
     def __init__(self, method='classical', show_depth=True):
         """
-        Initialize demo.
+        Set up demo.
         
         Args:
             method: Segmentation method ('classical', 'unet', 'maskrcnn')
@@ -55,7 +55,7 @@ class LiveDemo:
     
     def create_overlay_mask(self, mask, alpha=0.6):
         """
-        Create colored overlay from segmentation mask.
+        Make colored overlay from segmentation mask.
         
         Args:
             mask: Segmentation mask (H, W)
@@ -86,7 +86,7 @@ class LiveDemo:
             return self.models['classical'].segment_hands_faces(frame)
         
         elif self.method == 'unet':
-            # Preprocess for U-Net
+            # Prep for U-Net
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_tensor = torch.from_numpy(frame_rgb).permute(2, 0, 1).float() / 255.0
             frame_tensor = frame_tensor.unsqueeze(0)
@@ -244,17 +244,17 @@ class LiveDemo:
                 # Show main result
                 cv2.imshow('Hand/Face Segmentation Demo', result)
                 
-                # Show depth map if enabled
-                if self.show_depth and depth_map is not None:
-                    depth_vis = cv2.applyColorMap(
-                        cv2.convertScaleAbs(depth_map, alpha=255/depth_map.max()), 
-                        cv2.COLORMAP_JET
-                    )
-                    cv2.imshow('Depth Map', depth_vis)
+                # Show depth map if enabled (disabled for cleaner demo)
+                # if self.show_depth and depth_map is not None:
+                #     depth_vis = cv2.applyColorMap(
+                #         cv2.convertScaleAbs(depth_map, alpha=255/depth_map.max()), 
+                #         cv2.COLORMAP_JET
+                #     )
+                #     cv2.imshow('Depth Map', depth_vis)
                 
-                # Show segmentation mask
-                mask_vis = (mask * 127).astype(np.uint8)  # Scale for visibility
-                cv2.imshow('Segmentation Mask', mask_vis)
+                # Show segmentation mask (commented out for cleaner demo)
+                # mask_vis = (mask * 127).astype(np.uint8)  # Scale for visibility
+                # cv2.imshow('Segmentation Mask', mask_vis)
                 
                 # Handle key presses
                 key = cv2.waitKey(1) & 0xFF

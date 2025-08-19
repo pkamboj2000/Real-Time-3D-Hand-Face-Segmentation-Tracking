@@ -1,6 +1,6 @@
 """
 Core segmentation models for real-time hand/face tracking.
-Contains U-Net and Mask R-CNN implementations optimized for real-time inference.
+Contains U-Net and Mask R-CNN implementations for real-time inference.
 """
 
 import torch
@@ -17,7 +17,7 @@ import numpy as np
 class UNet(nn.Module):
     """
     U-Net model for semantic segmentation.
-    Optimized for real-time hand/face segmentation.
+    Built for real-time hand/face segmentation.
     """
     
     def __init__(self, in_channels=3, out_channels=3):
@@ -51,7 +51,7 @@ class UNet(nn.Module):
         self.pool = nn.MaxPool2d(2)
         
     def conv_block(self, in_channels, out_channels):
-        """Create a convolutional block with BatchNorm and ReLU."""
+        """Conv block with BatchNorm and ReLU."""
         return nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
@@ -94,7 +94,7 @@ class UNet(nn.Module):
 class MaskRCNN:
     """
     Mask R-CNN wrapper for instance segmentation.
-    Configured for hand and face detection.
+    Set up for hand and face detection.
     """
     
     def __init__(self, num_classes=3):  # background, hand, face
@@ -119,7 +119,7 @@ class MaskRCNN:
     
     def predict(self, image):
         """
-        Predict masks for input image.
+        Get masks for input image.
         
         Args:
             image: Input image (H, W, 3) numpy array
@@ -140,7 +140,7 @@ class MaskRCNN:
 
 class ClassicalBaseline:
     """
-    Classical computer vision baseline using skin detection and optical flow.
+    Classical computer vision baseline with skin detection and optical flow.
     """
     
     def __init__(self):
@@ -161,7 +161,7 @@ class ClassicalBaseline:
     
     def detect_skin(self, image):
         """
-        Detect skin regions using HSV and YCrCb color spaces.
+        Find skin regions using HSV and YCrCb color spaces.
         
         Args:
             image: Input BGR image
@@ -178,7 +178,7 @@ class ClassicalBaseline:
         upper_hsv = np.array([20, 255, 255], dtype=np.uint8)
         mask_hsv = cv2.inRange(hsv, lower_hsv, upper_hsv)
         
-        # YCrCb skin detection
+        # YCrCb skin detection  
         lower_ycrcb = np.array([0, 135, 85], dtype=np.uint8)
         upper_ycrcb = np.array([255, 180, 135], dtype=np.uint8)
         mask_ycrcb = cv2.inRange(ycrcb, lower_ycrcb, upper_ycrcb)
@@ -186,7 +186,7 @@ class ClassicalBaseline:
         # Combine masks
         skin_mask = cv2.bitwise_and(mask_hsv, mask_ycrcb)
         
-        # Morphological operations to clean up
+        # Clean up the mask a bit
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         skin_mask = cv2.morphologyEx(skin_mask, cv2.MORPH_OPEN, kernel)
         skin_mask = cv2.morphologyEx(skin_mask, cv2.MORPH_CLOSE, kernel)
@@ -206,18 +206,18 @@ class ClassicalBaseline:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
         if self.prev_frame is None:
-            # Initialize tracking
+            # First frame - just set up tracking
             self.prev_frame = gray
             self.prev_points = cv2.goodFeaturesToTrack(gray, mask=None, **self.feature_params)
             return [], []
         
         if self.prev_points is not None and len(self.prev_points) > 0:
-            # Track points
+            # Track the points we found before
             next_points, status, error = cv2.calcOpticalFlowPyrLK(
                 self.prev_frame, gray, self.prev_points, None, **self.lk_params
             )
             
-            # Select good points
+            # Keep only the good ones
             good_new = next_points[status == 1]
             good_old = self.prev_points[status == 1]
             
@@ -231,7 +231,7 @@ class ClassicalBaseline:
     
     def segment_hands_faces(self, image):
         """
-        Segment hands and faces using classical methods.
+        Find hands and faces using classical methods.
         
         Args:
             image: Input image
@@ -245,14 +245,14 @@ class ClassicalBaseline:
         # Find contours
         contours, _ = cv2.findContours(skin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        # Create output mask
+        # Make output mask
         mask = np.zeros(image.shape[:2], dtype=np.uint8)
         
         for contour in contours:
             area = cv2.contourArea(contour)
             
-            if area > 1000:  # Filter small regions
-                # Simple heuristic: larger regions are likely hands, smaller ones faces
+            if area > 1000:  # Skip small blobs
+                # Simple guess: bigger regions are hands, smaller ones faces
                 if area > 5000:
                     cv2.fillPoly(mask, [contour], 1)  # Hand class
                 else:
@@ -263,7 +263,7 @@ class ClassicalBaseline:
 
 class DepthEstimator:
     """
-    Depth estimation using MiDaS for 3D alignment.
+    Depth estimation with MiDaS for 3D stuff.
     """
     
     def __init__(self):
@@ -281,7 +281,7 @@ class DepthEstimator:
     
     def estimate_depth(self, image):
         """
-        Estimate depth from single image.
+        Get depth from single image.
         
         Args:
             image: Input BGR image
@@ -293,7 +293,7 @@ class DepthEstimator:
             # Return dummy depth map
             return np.ones(image.shape[:2], dtype=np.float32)
         
-        # Preprocess
+        # Prep the image
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         input_tensor = self.transform(rgb).to(self.device)
         
@@ -311,7 +311,7 @@ class DepthEstimator:
 
 def create_models():
     """
-    Factory function to create all models.
+    Make all the models we need.
     
     Returns:
         Dictionary with model instances

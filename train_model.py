@@ -22,12 +22,12 @@ from collections import defaultdict
 class HandFaceDataset(Dataset):
     """
     Dataset class for hand/face segmentation.
-    Supports multiple datasets: EgoHands, FreiHAND, CelebAMask-HQ, WFLW.
+    Works with multiple datasets: EgoHands, FreiHAND, CelebAMask-HQ, WFLW.
     """
     
     def __init__(self, data_dir, split='train', transform=None, target_size=(512, 512)):
         """
-        Initialize dataset.
+        Set up dataset.
         
         Args:
             data_dir: Root directory containing dataset
